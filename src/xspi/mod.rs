@@ -134,7 +134,7 @@ pub use common::{
 pub use octospi::{Hyperbus, HyperbusConfig, OctospiExt as XspiExt};
 
 // Both
-pub use common::{Config, Event, SamplingEdge};
+pub use common::{Config, Event, SamplingEdge, FuncMode};
 
 /// This modulate contains functionality common to both Quad and Octo SPI
 mod common {
@@ -299,6 +299,25 @@ mod common {
         }
     }
 
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub enum FuncMode {
+        Indirect,
+        AutoStatusPoll,
+        MemoryMapped
+    }
+
+    impl FuncMode {
+        #[inline(always)]
+        pub(super) fn reg_value(&self) -> u8 {
+            match self {
+                FuncMode::Indirect => 0,
+                FuncMode::AutoStatusPoll => 3,
+                FuncMode::MemoryMapped => 4,
+            }
+        }
+    }
+
     /// A structure for specifying the XSPI configuration.
     ///
     /// This structure uses builder semantics to generate the configuration.
@@ -313,6 +332,8 @@ mod common {
         pub(super) dummy_cycles: u8,
         pub(super) sampling_edge: SamplingEdge,
         pub(super) fifo_threshold: u8,
+        pub(super) func_mode: FuncMode,
+        pub(super) instruction: Option<u8>,
     }
 
     impl Config {
@@ -328,6 +349,8 @@ mod common {
                 dummy_cycles: 0,
                 sampling_edge: SamplingEdge::Falling,
                 fifo_threshold: 1,
+                func_mode: FuncMode::Indirect,
+                instruction: None
             }
         }
 
@@ -392,6 +415,11 @@ mod common {
             debug_assert!(threshold > 0 && threshold <= 32);
 
             self.fifo_threshold = threshold;
+            self
+        }
+
+        pub fn func_mode(mut self, func_mode: FuncMode) -> Self {
+            self.func_mode = func_mode;
             self
         }
     }

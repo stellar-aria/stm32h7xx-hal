@@ -7,6 +7,7 @@ use crate::{
     rcc::{rec, CoreClocks, ResetEnable},
     stm32,
 };
+use crate::xspi::common::XspiWord;
 
 use super::{common::BankSelect, Bank, Config, Qspi, QspiError, SamplingEdge};
 
@@ -288,7 +289,7 @@ impl Qspi<stm32::QUADSPI> {
         // Configure the communication method for QSPI.
         regs.ccr.write(|w| unsafe {
             w.fmode()
-                .bits(0) // indirect mode
+                .bits(config.func_mode.reg_value()) // indirect mode
                 .dmode()
                 .bits(config.mode.reg_value())
                 .admode()
@@ -296,7 +297,9 @@ impl Qspi<stm32::QUADSPI> {
                 .adsize()
                 .bits(0) // Eight-bit address
                 .imode()
-                .bits(0) // No instruction phase
+                .bits(config.instruction.and(Some(config.mode.reg_value())).unwrap_or(0)) // No instruction phase
+                .instruction()
+                .bits(config.instruction.unwrap_or(0))
                 .dcyc()
                 .bits(config.dummy_cycles)
         });
@@ -333,7 +336,7 @@ impl Qspi<stm32::QUADSPI> {
             Bank::Dual => regs.cr.modify(|_, w| w.dfm().set_bit()),
         }
 
-        // Enable ther peripheral
+        // Enable the peripheral
         regs.cr.modify(|_, w| w.en().set_bit());
 
         Qspi {
