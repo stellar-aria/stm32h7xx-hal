@@ -175,7 +175,7 @@ fn main() -> ! {
 
     // unmask interrupt handler for dma 1, stream 1
     unsafe {
-        pac::NVIC::unmask(pac::Interrupt::DMA1_STR1);
+        pac::NVIC::unmask(pac::Interrupt::DMA_STR1);
     }
 
     static mut TRANSFER_DMA1_STR1: MaybeUninit<Option<TransferDma1Str1>> =
@@ -233,7 +233,7 @@ fn main() -> ! {
     }
 
     #[interrupt]
-    fn DMA1_STR1() {
+    fn DMA_STR1() {
         #[allow(static_mut_refs)] // TODO: Fix this
         let tx_buffer: &'static mut [u32; DMA_BUFFER_LENGTH] =
             unsafe { TX_BUFFER.assume_init_mut() };

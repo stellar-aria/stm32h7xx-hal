@@ -133,7 +133,7 @@ mod app {
         (SharedResources { cs, transfer }, LocalResources {})
     }
 
-    #[task(binds=DMA1_STR1, shared = [transfer, cs], priority=2)]
+    #[task(binds=DMA_STR1, shared = [transfer, cs], priority=2)]
     fn dma_complete(ctx: dma_complete::Context) {
         // If desired, the transfer can scheduled again here to continue transmitting.
         (ctx.shared.transfer, ctx.shared.cs).lock(|transfer, cs| {
