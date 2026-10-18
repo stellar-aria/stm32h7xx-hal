@@ -1,5 +1,5 @@
-//! Demo for Nucleo-H723ZG eval board using the Real Time for the Masses
-//! (RTIC) framework.
+//! Demo for Nucleo-H723ZG evaluation board using the Real-Time Interrupt-driven
+//! Concurrency (RTIC) framework.
 //!
 //! This demo responds to pings on 192.168.1.99 (IP address hardcoded below)
 //!
@@ -116,9 +116,7 @@ mod app {
     }
 
     #[init]
-    fn init(
-        mut ctx: init::Context,
-    ) -> (SharedResources, LocalResources, init::Monotonics) {
+    fn init(mut ctx: init::Context) -> (SharedResources, LocalResources) {
         utilities::logger::init();
         // Initialise power...
         let pwr = ctx.device.PWR.constrain();
@@ -143,6 +141,7 @@ mod app {
         let gpioc = ctx.device.GPIOC.split(ccdr.peripheral.GPIOC);
         let gpioe = ctx.device.GPIOE.split(ccdr.peripheral.GPIOE);
         let gpiob = ctx.device.GPIOB.split(ccdr.peripheral.GPIOB);
+        let gpiog = ctx.device.GPIOG.split(ccdr.peripheral.GPIOG);
         let mut link_led = gpioe.pe1.into_push_pull_output(); // USR LED1
         link_led.set_high();
 
@@ -152,8 +151,8 @@ mod app {
         let rmii_crs_dv = gpioa.pa7.into_alternate();
         let rmii_rxd0 = gpioc.pc4.into_alternate();
         let rmii_rxd1 = gpioc.pc5.into_alternate();
-        let rmii_tx_en = gpiob.pb11.into_alternate();
-        let rmii_txd0 = gpiob.pb12.into_alternate();
+        let rmii_tx_en = gpiog.pg11.into_alternate();
+        let rmii_txd0 = gpiog.pg13.into_alternate();
         let rmii_txd1 = gpiob.pb13.into_alternate();
 
         // Initialise ethernet...
@@ -227,7 +226,6 @@ mod app {
                 lan8742a,
                 link_led,
             },
-            init::Monotonics(),
         )
     }
 

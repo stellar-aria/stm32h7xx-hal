@@ -12,9 +12,7 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::ptr;
 
-use embedded_hal::blocking::serial as serial_block;
-use embedded_hal::prelude::*;
-use embedded_hal::serial;
+use embedded_hal_02::prelude::*;
 use nb::block;
 
 use stm32::usart1::cr2::{CLKEN, CPHA, CPOL, LBCL, MSBFIRST, RXINV, TXINV};
@@ -962,7 +960,7 @@ macro_rules! usart {
                 }
             }
 
-            impl serial::Read<u8> for Serial<$USARTX> {
+            impl embedded_hal_02::serial::Read<u8> for Serial<$USARTX> {
                 type Error = Error;
 
                 fn read(&mut self) -> nb::Result<u8, Error> {
@@ -974,7 +972,7 @@ macro_rules! usart {
                 }
             }
 
-            impl serial::Read<u8> for Rx<$USARTX> {
+            impl embedded_hal_02::serial::Read<u8> for Rx<$USARTX> {
                 type Error = Error;
 
                 fn read(&mut self) -> nb::Result<u8, Error> {
@@ -1062,7 +1060,7 @@ macro_rules! usart {
                 }
             }
 
-            impl serial::Write<u8> for Serial<$USARTX> {
+            impl embedded_hal_02::serial::Write<u8> for Serial<$USARTX> {
                 type Error = core::convert::Infallible;
 
                 fn flush(&mut self) -> nb::Result<(), Self::Error> {
@@ -1080,11 +1078,11 @@ macro_rules! usart {
                 }
             }
 
-            impl serial_block::write::Default<u8> for Serial<$USARTX> {
+            impl embedded_hal_02::blocking::serial::write::Default<u8> for Serial<$USARTX> {
                 //implement marker trait to opt-in to default blocking write implementation
             }
 
-            impl serial::Write<u8> for Tx<$USARTX> {
+            impl embedded_hal_02::serial::Write<u8> for Tx<$USARTX> {
                 // NOTE(Void) See section "29.7 USART interrupts"; the
                 // only possible errors during transmission are: clear
                 // to send (which is disabled in this case) errors and
@@ -1295,7 +1293,7 @@ usart_sel! {
 
 impl<USART> fmt::Write for Tx<USART>
 where
-    Tx<USART>: serial::Write<u8>,
+    Tx<USART>: embedded_hal_02::serial::Write<u8>,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
@@ -1305,7 +1303,7 @@ where
 
 impl<USART> fmt::Write for Serial<USART>
 where
-    Serial<USART>: serial::Write<u8>,
+    Serial<USART>: embedded_hal_02::serial::Write<u8>,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
