@@ -1177,7 +1177,7 @@ peripheral_target_address!(
         DMAReq::Adc2Dma
     )
 );
-#[cfg(not(feature = "rm0455"))]
+#[cfg(any(feature = "rm0433", feature = "rm0399"))]
 peripheral_target_address!((
     HAL: Adc<pac::ADC3, adc::Enabled>,
     dr,

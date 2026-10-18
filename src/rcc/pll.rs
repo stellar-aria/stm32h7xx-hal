@@ -96,7 +96,7 @@ macro_rules! vco_setup {
 
          // Input divisor, resulting in a reference clock in the range
          // 1 to 2 MHz. Choose the highest reference clock (lowest m)
-         let pll_x_m = ($pllsrc + 1_999_999) / 2_000_000;
+         let pll_x_m = u32::div_ceil($pllsrc, 2_000_000);
 
          assert!(pll_x_m < 64);
 
@@ -134,7 +134,7 @@ macro_rules! vco_setup {
 
          // Input divisor, resulting in a reference clock in the
          // range 2 to 16 MHz.
-         let pll_x_m_min = ($pllsrc + 15_999_999) / 16_000_000;
+         let pll_x_m_min = u32::div_ceil($pllsrc, 16_000_000);
          let pll_x_m_max = match $pllsrc {
              0 ..= 127_999_999 => $pllsrc / 2_000_000,
              _ => 63            // pllm < 64
@@ -376,10 +376,20 @@ impl Rcc {
                      r_ck: (divr1, divr1en, 2, unsafe) ],
                  pll1_p)
     }
+    #[cfg(not(any(feature = "stm32h753", feature = "stm32h753v")))]
     pll_setup! {
     pll2_setup: (pll2vcosel, pll2rge, pll2fracen, pll2divr, divn2, divm2, pll2fracr, fracn2,
                  OUTPUTS: [
                      p_ck: (divp2, divp2en, 0, unsafe),
+                     q_ck: (divq2, divq2en, 1, unsafe),
+                     r_ck: (divr2, divr2en, 2, unsafe)])
+    }
+    // The stm32h753(v) SVDs in PAC v0.16.0 name the PLL2 P divider `DIVP12`
+    #[cfg(any(feature = "stm32h753", feature = "stm32h753v"))]
+    pll_setup! {
+    pll2_setup: (pll2vcosel, pll2rge, pll2fracen, pll2divr, divn2, divm2, pll2fracr, fracn2,
+                 OUTPUTS: [
+                     p_ck: (divp12, divp2en, 0, unsafe),
                      q_ck: (divq2, divq2en, 1, unsafe),
                      r_ck: (divr2, divr2en, 2, unsafe)])
     }

@@ -21,7 +21,13 @@
 use core::slice;
 
 use crate::signature::FlashSize;
-use crate::stm32::{flash::BANK, FLASH};
+#[cfg(not(feature = "rm0468"))]
+use crate::stm32::flash::BANK;
+use crate::stm32::FLASH;
+// RM0468 parts have a single bank, whose registers are not grouped into a
+// BANK cluster in the PAC
+#[cfg(feature = "rm0468")]
+type BANK = crate::stm32::flash::RegisterBlock;
 use embedded_storage::nor_flash;
 
 mod operations;
@@ -236,9 +242,15 @@ pub struct LockedFlashBank {
 #[allow(clippy::len_without_is_empty)]
 impl LockedFlashBank {
     fn registers(&self) -> &BANK {
+        #[cfg(not(feature = "rm0468"))]
         match self.bank_index {
             1 => unsafe { &*FLASH::ptr() }.bank1(),
             2 => unsafe { &*FLASH::ptr() }.bank2(),
+            _ => unreachable!(),
+        }
+        #[cfg(feature = "rm0468")]
+        match self.bank_index {
+            1 => unsafe { &*FLASH::ptr() },
             _ => unreachable!(),
         }
     }
@@ -277,10 +289,8 @@ const UNLOCK_KEY2: u32 = 0xCDEF_89AB;
 
 #[allow(unused_unsafe)]
 fn unlock(bank: &BANK) {
-    bank.keyr()
-        .write(|w| unsafe { w.key1r().bits(UNLOCK_KEY1) });
-    bank.keyr()
-        .write(|w| unsafe { w.key1r().bits(UNLOCK_KEY2) });
+    bank.keyr().write(|w| unsafe { w.bits(UNLOCK_KEY1) });
+    bank.keyr().write(|w| unsafe { w.bits(UNLOCK_KEY2) });
     assert!(!bank.cr().read().lock().bit())
 }
 

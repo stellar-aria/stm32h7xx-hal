@@ -20,13 +20,8 @@ use nb::block;
 
 use crate::stm32::ADC12_COMMON;
 use crate::stm32::{ADC1, ADC2};
-#[cfg(not(feature = "rm0455"))]
+#[cfg(any(feature = "rm0433", feature = "rm0399"))]
 use crate::stm32::{ADC3, ADC3_COMMON};
-
-#[cfg(feature = "rm0455")]
-use crate::stm32::adc12_common::ccr::PRESC;
-#[cfg(not(feature = "rm0455"))]
-use crate::stm32::adc3_common::ccr::PRESC;
 
 use crate::gpio::{self, Analog};
 use crate::pwr::{current_vos, VoltageScale};
@@ -199,6 +194,7 @@ macro_rules! adc_pins {
     };
 }
 
+#[allow(unused_macros)] // No internal channels are defined on RM0468
 macro_rules! adc_internal {
     ([$INT_ADC:ident, $INT_ADC_COMMON:ident]; $($input:ty => ($chan:expr, $en:ident)),+ $(,)*) => {
         $(
@@ -328,34 +324,11 @@ adc_internal!(
 
 // ADC 3 not present on RM0455 parts
 
-#[cfg(feature = "rm0468")]
-adc_pins!(ADC3,
-    // 0, 1 are Pxy_C pins
-    gpio::PF9<Analog> => 2,
-    gpio::PF7<Analog> => 3,
-    gpio::PF5<Analog> => 4,
-    gpio::PF3<Analog> => 5,
-    gpio::PF10<Analog> => 6,
-    gpio::PF8<Analog> => 7,
-    gpio::PF6<Analog> => 8,
-    gpio::PF4<Analog> => 9,
-    gpio::PC0<Analog> => 10,
-    gpio::PC1<Analog> => 11,
-    gpio::PC2<Analog> => 12,
-    gpio::PH2<Analog> => 13,
-    gpio::PH3<Analog> => 14,
-    gpio::PH4<Analog> => 15,
-    // Although ADC3_INP16 appears in device datasheets (on PH5), RM0468 Rev 7
-    // Figure 231 does not show ADC3_INP16
-);
-#[cfg(feature = "rm0468")]
-adc_internal!(
-    [ADC3, ADC3_COMMON];
-
-    Vbat => (16, vbaten),
-    Temperature => (17, vsenseen),
-    Vrefint => (18, vrefen)
-);
+// ADC3 on RM0468 parts is a different 12-bit ADC (no PCSEL, BOOST or linear
+// calibration; DMA via CFGR.DMAEN/DMACFG). It is not yet supported. Channels:
+// PF9 => 2, PF7 => 3, PF5 => 4, PF3 => 5, PF10 => 6, PF8 => 7, PF6 => 8,
+// PF4 => 9, PC0 => 10, PC1 => 11, PC2 => 12, PH2 => 13, PH3 => 14, PH4 => 15,
+// Vbat => 16, Temperature => 17, Vrefint => 18 (RM0468 Rev 7 Figure 231)
 
 pub trait AdcExt<ADC>: Sized {
     type Rec: ResetEnable;
@@ -470,7 +443,7 @@ pub fn free_adc12<ED>(
     )
 }
 
-#[cfg(not(feature = "rm0455"))]
+#[cfg(any(feature = "rm0433", feature = "rm0399"))]
 /// Freeing both the peripheral and PREC is possible for ADC3
 impl<ED> Adc<ADC3, ED> {
     /// Releases the ADC peripheral
@@ -597,23 +570,25 @@ macro_rules! adc_hal {
                     let f_target = f_adc.raw();
 
                     let (divider, presc) = match ker_ck.raw().div_ceil(f_target) {
-                        1 => (1, PRESC::Div1),
-                        2 => (2, PRESC::Div2),
-                        3..=4 => (4, PRESC::Div4),
-                        5..=6 => (6, PRESC::Div6),
-                        7..=8 => (8, PRESC::Div8),
-                        9..=10 => (10, PRESC::Div10),
-                        11..=12 => (12, PRESC::Div12),
-                        13..=16 => (16, PRESC::Div16),
-                        17..=32 => (32, PRESC::Div32),
-                        33..=64 => (64, PRESC::Div64),
-                        65..=128 => (128, PRESC::Div128),
-                        129..=256 => (256, PRESC::Div256),
+                        1 => (1, 0b0000),
+                        2 => (2, 0b0001),
+                        3..=4 => (4, 0b0010),
+                        5..=6 => (6, 0b0011),
+                        7..=8 => (8, 0b0100),
+                        9..=10 => (10, 0b0101),
+                        11..=12 => (12, 0b0110),
+                        13..=16 => (16, 0b0111),
+                        17..=32 => (32, 0b1000),
+                        33..=64 => (64, 0b1001),
+                        65..=128 => (128, 0b1010),
+                        129..=256 => (256, 0b1011),
                         _ => panic!("Selecting the ADC clock required a prescaler > 256, \
                                      which is not possible in hardware. Either increase the ADC \
                                      clock frequency or decrease the kernel clock frequency"),
                     };
-                    unsafe { &*$ADC_COMMON::ptr() }.ccr().modify(|_, w| w.presc().variant(presc));
+                    // PRESC[3:0] code. Written as raw bits as not all PACs provide an enum
+                    #[allow(unused_unsafe)]
+                    unsafe { &*$ADC_COMMON::ptr() }.ccr().modify(|_, w| unsafe { w.presc().bits(presc) });
 
                     // Calculate actual value. See RM0433 Rev 7 - Figure 136.
                     #[cfg(feature = "revision_v")]
@@ -805,7 +780,8 @@ macro_rules! adc_hal {
                     self.rb.cfgr2().modify(|_, w| w.lshift().set(self.get_lshift().value()));
 
                     // Select channel (with preselection, refer to RM0433 Rev 7 - Chapter 25.4.12)
-                    self.rb.pcsel().modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
+                    // Raw bits: some PACs split PCSEL into one field per channel
+                    self.rb.pcsel().modify(|r, w| unsafe { w.bits(r.bits() | (1 << chan)) });
                     self.set_chan_smp(chan);
                     self.rb.sqr1().modify(|_, w| unsafe {
                         w.sq1().bits(chan)
@@ -875,7 +851,7 @@ macro_rules! adc_hal {
                     }
 
                     // Disable preselection of this channel, refer to RM0433 Rev 7 - Chapter 25.4.12
-                    self.rb.pcsel().modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() & !(1 << chan)) });
+                    self.rb.pcsel().modify(|r, w| unsafe { w.bits(r.bits() & !(1 << chan)) });
                     self.current_channel = None;
 
                     // Retrieve result
@@ -1137,5 +1113,3 @@ adc_hal!(
 
 #[cfg(any(feature = "rm0433", feature = "rm0399"))]
 adc_hal!(ADC3, ADC3_COMMON: (adc3, Adc3, ldordy));
-#[cfg(feature = "rm0468")]
-adc_hal!(ADC3, ADC3_COMMON: (adc3, Adc3));

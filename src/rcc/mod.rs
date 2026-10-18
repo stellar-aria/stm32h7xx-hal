@@ -1088,10 +1088,15 @@ impl Rcc {
             );
 
             let pll2divr = rcc.pll2divr().read();
+            #[cfg(not(any(feature = "stm32h753", feature = "stm32h753v")))]
+            let divp2 = pll2divr.divp2().bits();
+            // The stm32h753(v) SVDs in PAC v0.16.0 name this field `DIVP12`
+            #[cfg(any(feature = "stm32h753", feature = "stm32h753v"))]
+            let divp2 = pll2divr.divp12().bits();
             debug!(
                 "PLL2DIVR register: DIVN2={:#x} DIVP2={:#x} DIVQ2={:#x} DIVR2={:#x}",
                 pll2divr.divn2().bits(),
-                pll2divr.divp2().bits(),
+                divp2,
                 pll2divr.divq2().bits(),
                 pll2divr.divr2().bits(),
             );

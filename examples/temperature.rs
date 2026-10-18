@@ -4,6 +4,8 @@
 //! For an example of using ADC1 and ADC2 together, see examples/adc12.rs
 //! For an example of using ADC1 and ADC2 in parallel, see examples/adc12_parallel.rs
 
+// Unused on RM0468, where this example is a stub
+#![cfg_attr(feature = "rm0468", allow(unused))]
 #![no_main]
 #![no_std]
 
@@ -21,6 +23,18 @@ use stm32h7xx_hal::{
 
 use log::info;
 
+// ADC3 on RM0468 parts is a 12-bit ADC that is not yet supported by this HAL
+#[cfg(feature = "rm0468")]
+#[entry]
+fn main() -> ! {
+    utilities::logger::init();
+    info!("stm32h7xx-hal example - Temperature: ADC3 is not yet supported on RM0468 parts");
+    loop {
+        cortex_m::asm::nop()
+    }
+}
+
+#[cfg(not(feature = "rm0468"))]
 #[entry]
 fn main() -> ! {
     utilities::logger::init();

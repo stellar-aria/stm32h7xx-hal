@@ -138,6 +138,7 @@ macro_rules! peripheral_reset_and_enable_control {
         $(
             $( #[ $pmeta:meta ] )*
                 $(($Auto:ident))* $p:ident
+                $({ $en:ident, $rst:ident, $lpen:ident })?
                 $([ kernel $clk:ident: $pk:ident $(($Variant:ident))* $pk_alias:ident $ccip:ident $clk_doc:expr ])*
                 $([ group clk: $pk_g:ident $( $(($Variant_g:ident))* $pk_g_alias:ident $ccip_g:ident $clk_doc_g:expr )* ])*
                 $([ fixed clk: $clk_doc_f:expr ])*
@@ -183,7 +184,7 @@ macro_rules! peripheral_reset_and_enable_control {
                 $(
                     #[ $tmeta ]
                     peripheral_reset_and_enable_control_generator! (
-                        $AXBn, $(($Auto))* $p, [< $p:upper >], [< $p:lower >],
+                        $AXBn, $(($Auto))* $p $({ $en, $rst, $lpen })?, [< $p:upper >], [< $p:lower >],
                         $( $pmeta )*
                         $(
                             [kernel $clk: $pk $(($Variant))* $pk_alias $ccip $clk_doc]
@@ -210,7 +211,7 @@ macro_rules! peripheral_reset_and_enable_control {
 macro_rules! peripheral_reset_and_enable_control_generator {
     (
         $AXBn:ident,
-        $(($Auto:ident))* $p:ident,
+        $(($Auto:ident))* $p:ident $({ $en:ident, $rst:ident, $lpen:ident })?,
         $p_upper:ident,         // Lower and upper case $p available for use in
         $p_lower:ident,         // comments, equivalent to with the paste macro.
 
@@ -291,7 +292,7 @@ macro_rules! peripheral_reset_and_enable_control_generator {
                         let lpenr = unsafe {
                             &(*RCC::ptr()).[< $AXBn:lower lpenr >]()
                         };
-                        lpenr.modify(|_, w| w.[< $p:lower lpen >]()
+                        lpenr.modify(|_, w| rcc_field!(w, [< $p:lower lpen >] $(, $lpen)?)
                                      .bit(lpm != LowPowerMode::Off));
                         // AMEN
                         $(
@@ -314,8 +315,8 @@ macro_rules! peripheral_reset_and_enable_control_generator {
                         let enr = unsafe {
                             &(*RCC::ptr()).[< $AXBn:lower enr >]()
                         };
-                        enr.modify(|_, w| w.
-                                   [< $p:lower en >]().set_bit());
+                        enr.modify(|_, w| rcc_field!(w, [< $p:lower en >] $(, $en)?)
+                                   .set_bit());
                     });
                     self
                 }
@@ -326,8 +327,8 @@ macro_rules! peripheral_reset_and_enable_control_generator {
                         let enr = unsafe {
                             &(*RCC::ptr()).[< $AXBn:lower enr >]()
                         };
-                        enr.modify(|_, w| w.
-                                   [< $p:lower en >]().clear_bit());
+                        enr.modify(|_, w| rcc_field!(w, [< $p:lower en >] $(, $en)?)
+                                   .clear_bit());
                     });
                     self
                 }
@@ -338,10 +339,10 @@ macro_rules! peripheral_reset_and_enable_control_generator {
                         let rstr = unsafe {
                             &(*RCC::ptr()).[< $AXBn:lower rstr >]()
                         };
-                        rstr.modify(|_, w| w.
-                                    [< $p:lower rst >]().set_bit());
-                        rstr.modify(|_, w| w.
-                                    [< $p:lower rst >]().clear_bit());
+                        rstr.modify(|_, w| rcc_field!(w, [< $p:lower rst >] $(, $rst)?)
+                                    .set_bit());
+                        rstr.modify(|_, w| rcc_field!(w, [< $p:lower rst >] $(, $rst)?)
+                                    .clear_bit());
                     });
                     self
                 }
@@ -455,6 +456,19 @@ macro_rules! peripheral_reset_and_enable_control_generator {
     }
 }
 
+// Selects the PAC field accessor for an enable / reset / low-power enable
+// bit. By default this is derived from the peripheral name, but it can be
+// overridden with `Peripheral { en, rst, lpen }` where the PAC naming is
+// inconsistent.
+macro_rules! rcc_field {
+    ($w:ident, $default:ident) => {
+        $w.$default()
+    };
+    ($w:ident, $default:ident, $override:ident) => {
+        $w.$override()
+    };
+}
+
 // If the PAC does not fully specify a CCIP field (perhaps because one or
 // more values are reserved), then we use a different return type
 macro_rules! variant_return_type {
@@ -491,6 +505,9 @@ macro_rules! autonomous {
 // compilation attribute. However, this only works for peripherals without
 // kernel clock multiplexers.
 //
+// If the PAC names a peripheral's enable / reset / low-power enable fields
+// inconsistently, they can be given explicitly as `Peripheral { en, rst, lpen }`.
+//
 // Peripherals with an individual kernel clock must be marked "kernel clk". If a
 // kernel clock multiplexer is shared between multiple peripherals, all those
 // peripherals must instead be marked with a common "group clk".
@@ -503,8 +520,16 @@ peripheral_reset_and_enable_control! {
     AHB1, "" => [
         Eth1Mac,
         #[cfg(any(feature = "rm0399"))] Art,
-        Adc12 [group clk: Adc(Variant) ADC d3ccip "ADC"],
+        Adc12 [group clk: Adc(Variant) ADC d3ccip "ADC"]
+    ];
+    #[cfg(any(feature = "rm0433", feature = "rm0399"))]
+    AHB1, "" => [
         Usb1Otg [group clk: Usb USB d2ccip2 "USB"]
+    ];
+    #[cfg(feature = "rm0468")]
+    AHB1, "" => [
+        Usb1Otg { usb1otghsen, usb1otgrst, usb1otglpen }
+            [group clk: Usb USB d2ccip2 "USB"]
     ];
     #[cfg(any(feature = "rm0433", feature = "rm0399"))]
     AHB1, "" => [
@@ -561,14 +586,18 @@ peripheral_reset_and_enable_control! {
     ];
     #[cfg(feature = "rm0468")]
     AHB3, "" => [
-        Octospi1 [group clk: Octospi FMC d1ccip "OCTOSPI"],
-        Octospi2 [group clk: Octospi]
+        Octospi1 { octospi1en, octospi1rst, octo1lpen }
+            [group clk: Octospi FMC d1ccip "OCTOSPI"],
+        Octospi2 { octospi2en, octospi2rst, octo2lpen }
+            [group clk: Octospi]
     ];
 
 
     #[cfg(all())]
     AHB4, "AMBA High-performance Bus (AHB4) peripherals" => [
-        Gpioa, Gpiob, Gpioc, Gpiod, Gpioe, Gpiof, Gpiog, Gpioh, Gpioi, Gpioj, Gpiok
+        Gpioa, Gpiob, Gpioc, Gpiod, Gpioe, Gpiof, Gpiog, Gpioh,
+        #[cfg(not(feature = "rm0468"))] Gpioi,
+        Gpioj, Gpiok
     ];
     #[cfg(not(feature = "rm0455"))]
     AHB4, "" => [
@@ -622,10 +651,10 @@ peripheral_reset_and_enable_control! {
     ];
     #[cfg(feature = "rm0468")]
     APB1L, "" => [
-        I2c1 [group clk: I2c1235 I2C1235 d2ccip2 "I2C1/2/3/5"],
-        I2c2 [group clk: I2c1235],
-        I2c3 [group clk: I2c1235],
-        I2c5 [group clk: I2c1235]
+        I2c1 [group clk: I2c123 I2C123 d2ccip2 "I2C1/2/3/5"],
+        I2c2 [group clk: I2c123],
+        I2c3 [group clk: I2c123],
+        I2c5 [group clk: I2c123]
     ];
 
 

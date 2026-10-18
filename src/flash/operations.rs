@@ -4,7 +4,7 @@ use core::sync::atomic::{fence, Ordering};
 use core::{ptr, slice};
 
 use super::FlashSectorIterator;
-use crate::stm32::flash::BANK;
+use super::BANK;
 use embedded_storage::nor_flash::{
     ErrorType, NorFlash, NorFlashError, NorFlashErrorKind, ReadNorFlash,
 };
@@ -175,10 +175,6 @@ impl UnlockedFlashBank<'_> {
         #[rustfmt::skip]
         self.bank.cr().modify(|_, w| unsafe {
             // sector number
-            #[cfg(feature = "rm0455")]
-            let w = w.ssn().bits(sector);
-
-            #[cfg(not(feature = "rm0455"))]
             let w = w.snb().bits(sector);
 
             // sector erase

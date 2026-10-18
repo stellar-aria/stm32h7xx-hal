@@ -289,7 +289,7 @@ impl HardwareCS {
     }
 
     fn interleaved_cs(&self) -> bool {
-        matches!(self.mode, HardwareCSMode::WordTransaction { .. })
+        matches!(self.mode, HardwareCSMode::WordTransaction)
     }
 }
 

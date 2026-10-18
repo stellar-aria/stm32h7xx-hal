@@ -151,8 +151,14 @@ macro_rules! usb_peripheral {
     };
 }
 
+#[cfg(not(feature = "rm0468"))]
 usb_peripheral! {
     USB1, OTG1_HS_GLOBAL, usb1otgen, usb1otgrst
+}
+// The RM0468 PAC names this enable field USB1OTGHSEN
+#[cfg(feature = "rm0468")]
+usb_peripheral! {
+    USB1, OTG1_HS_GLOBAL, usb1otghsen, usb1otgrst
 }
 pub type Usb1BusType = UsbBus<USB1>;
 
@@ -305,7 +311,10 @@ unsafe impl UsbPeripheral for USB1_ULPI {
 
         cortex_m::interrupt::free(|_| {
             // Enable USB peripheral
+            #[cfg(not(feature = "rm0468"))]
             rcc.ahb1enr().modify(|_, w| w.usb1otgen().enabled());
+            #[cfg(feature = "rm0468")]
+            rcc.ahb1enr().modify(|_, w| w.usb1otghsen().enabled());
 
             // Enable ULPI Clock
             rcc.ahb1enr().modify(|_, w| w.usb1otgulpien().enabled());

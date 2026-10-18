@@ -438,7 +438,7 @@ impl<S, P: SdmmcPeripheral> Sdmmc<S, P> {
         match ker_ck.raw().div_ceil(sdmmc_ck) {
             0 | 1 => Ok((0, ker_ck)),
             x @ 2..=2046 => {
-                let clk_div = ((x + 1) / 2) as u16;
+                let clk_div = x.div_ceil(2) as u16;
                 let clk = Hertz::from_raw(ker_ck.raw() / (clk_div as u32 * 2));
 
                 Ok((clk_div, clk))
