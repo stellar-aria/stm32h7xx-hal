@@ -1,6 +1,6 @@
 on:
   push:
-    branches: [ master ]        # Do not run on staging / trying
+    branches: [ dev, master ]   # Do not run on staging / trying
   pull_request:
 
 # Checks the crate compiles on nightly rust, and that the logging options for the

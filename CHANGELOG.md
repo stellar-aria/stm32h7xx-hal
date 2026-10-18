@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
-* MSRV increased to Rust 1.80.0
+* MSRV increased to Rust 1.87.0 (required by `embedded-storage` 0.3.2 and the
+  edition 2024 `cortex-m` crates)
+* **Breaking** Update to `stm32h7` PAC v0.16.0 [#519] [#525]
+* **Breaking** rm0468: The I2C1/2/3/5 kernel clock group is renamed from
+  `I2c1235` to `I2c123` to match the PAC (`kernel_i2c123_clk_mux`)
+* **Breaking** rm0468: ADC3 is no longer supported. It is a 12-bit ADC with a
+  different register layout to ADC1/2, and was previously driven incorrectly
+* rcc: Peripherals can override PAC enable/reset/low-power field names
 * **Breaking** Rename export `stm32h7xx-hal::hal` to `stm32h7xx-hal::hal_02` [#504]
 * **Breaking** Update `smoltcp` to `0.12.0` (from `0.11.0`) [#508]
 * ethernet: Fix eth::DesRing alignment [#510]
@@ -423,3 +430,5 @@
 [#504]: https://github.com/stm32-rs/stm32h7xx-hal/pull/504
 [#508]: https://github.com/stm32-rs/stm32h7xx-hal/pull/508
 [#510]: https://github.com/stm32-rs/stm32h7xx-hal/pull/510
+[#519]: https://github.com/stm32-rs/stm32h7xx-hal/pull/519
+[#525]: https://github.com/stm32-rs/stm32h7xx-hal/pull/525
